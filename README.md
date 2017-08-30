@@ -1,0 +1,3 @@
+- Nvidia works
+- Touchpad fully works(Disable while typing also)
+- Audio/Brightness multimedia keys work
