@@ -1,0 +1,46 @@
+! 108 is the Alt_R.
+keycode 108 = Mode_switch Mode_switch
+! keycode XX = A B C D
+! XX is the keycode (not the keysym, retrieved by xev)
+! A is the keysym output when just the key is pressed
+! B is the keysym output when the key is pressed + Shift
+! C is the keysym output when the key is pressed + Mode_switch (now Alt_R)
+! D is the keysym output when the key is pressed + Shift + Mode_switch (now Alt_R)
+
+! make some arrow keys on the h, j, k, l row
+keycode  43 = h H Left 
+keycode  44 = j J Down
+keycode  45 = k K Up 
+keycode  46 = l L Right
+keycode  26 = e E Home
+keycode  40 = d D End
+! Page Up
+keycode  25 = w W Prior
+! Page Down
+keycode  39 = s S Next
+
+keycode  10 = 1 exclam F1
+keycode  11 = 2 at F2
+keycode  12 = 3 numbersign F3
+keycode  13 = 4 dollar F4
+keycode  14 = 5 percent F5
+keycode  15 = 6 asciicircum F6
+keycode  16 = 7 ampersand F7
+keycode  17 = 8 asterisk F8
+keycode  18 = 9 parenleft F9
+keycode  19 = 0 parenright F10
+keycode  20 = minus underscore F11
+keycode  21 = equal plus F12
+
+keycode  65 = space NoSymbol BackSpace
+keycode  22 = BackSpace BackSpace Delete
+keycode  51 = backslash bar asciitilde
+keycode  49 = Escape NoSymbol grave asciitilde
+
+!swap Caps_Lock and Control_L
+remove Lock = Caps_Lock
+remove Control = Control_L
+keycode 37 = Caps_Lock
+keycode 66 = Control_L
+add Lock = Caps_Lock
+add Control = Control_L
