@@ -8,30 +8,38 @@
   (setq-default
    ;; List of additional paths where to look for configuration layers.
    ;; Paths must have a trailing slash (ie. `~/.mycontribs/')
-   dotspacemacs-configuration-layer-path '()
+   dotspacemacs-configuration-layer-path '("~/.emacs.d/private/")
    ;; List of configuration layers to load. If it is the symbol `all' instead
    ;; of a list then all discovered layers will be installed.
    dotspacemacs-configuration-layers
-   '(
+   '(csv
+     systemd
+     markdown
+     ansible
      sql
-     javascript
      yaml
-     python
-     ;; ----------------------------------------------------------------
-     ;; Example of useful layers you may want to use right away.
-     ;; Uncomment some layer names and press <SPC f e R> (Vim style) or
-     ;; <M-m f e R> (Emacs style) to install them.
-     ;; ----------------------------------------------------------------
      auto-completion
      better-defaults
+     (c-c++ :variables
+            c-c++-enable-clang-format-on-save t
+            c-c++-enable-google-style t
+            c-c++-enable-google-newline t
+            c-c++-backend 'lsp-ccls
+            c-c++-lsp-sem-highlight-method 'font-lock
+            c-c++-default-mode-for-headers 'c++-mode)
      colors
      emacs-lisp
      fasd
      git
      (go :variables
-         go-tab-width 4
+         go-use-golangci-lint t
+         godoc-at-point-function 'godoc-gogetdoc
+         go-tab-width 2
+         go-backend 'lsp
          gofmt-command "goimports"
          gofmt-args (list "-local" "rubrik"))
+     lsp
+     protobuf
      python
      (shell :variables
             shell-default-term-shell "/bin/zsh")
@@ -43,12 +51,18 @@
    ;; packages then consider to create a layer, you can also put the
    ;; configuration in `dotspacemacs/config'.
    dotspacemacs-additional-packages '(
+                                      json-mode
+                                      strace-mode
+                                      xclip
+                                      badwolf-theme
                                       doom-themes
                                       multiple-cursors
                                       visual-regexp-steroids
                                       visual-regexp
                                       ace-jump-mode
                                       solarized-theme
+                                      speed-type
+                                      xresources-theme
                                       )
    ;; A list of packages and/or extensions that will not be install and loaded.
    dotspacemacs-excluded-packages '(org-pomodoro flycheck-pos-tip)
@@ -83,23 +97,21 @@ before layers configuration."
    ;; Press <SPC> T n to cycle to the next theme in the list (works great
    ;; with 2 themes variants, one dark and one light)
    dotspacemacs-themes '(
-                         doom-one
-                         apropospriate-dark
+                         doom-tomorrow-night
+                         zenburn
+                         xresources
                          spacemacs-dark
                          solarized-dark
                          spacemacs-light
                          solarized-light
-                         leuven
-                         monokai
-                         zenburn)
+                         monokai)
    ;; If non nil the cursor color matches the state color.
    dotspacemacs-colorize-cursor-according-to-state t
    ;; Default font. `powerline-scale' allows to quickly tweak the mode-line
    ;; size to make separators look not too crappy.
-   dotspacemacs-default-font '("PragmataPro Nerd Font"
-                               :size 14
-                               :weight normal
-                               :width normal
+   ;;dotspacemacs-default-font '("Iosevka Nerd Font"
+   dotspacemacs-default-font '("Iosevka"
+                               :size 16
                                :powerline-scale 1.0)
    ;; The leader key
    dotspacemacs-leader-key "SPC"
@@ -147,7 +159,7 @@ before layers configuration."
    ;; Transparency can be toggled through `toggle-transparency'.
    dotspacemacs-inactive-transparency 90
    ;; If non nil unicode symbols are displayed in the mode line.
-   dotspacemacs-mode-line-unicode-symbols t
+   dotspacemacs-mode-line-unicode-symbols nil
    ;; If non nil smooth scrolling (native-scrolling) is enabled. Smooth
    ;; scrolling overrides the default behavior of Emacs which recenters the
    ;; point when it reaches the top or bottom of the screen.
@@ -170,15 +182,13 @@ before layers configuration."
   )
 
 (defun dotspacemacs/user-init ()
-  (define-key global-map (kbd "C-d")  'delete-backward-char)
+
  )
 
 (defun dotspacemacs/user-config ()
   "Configuration function.
  This function is called at the very end of Spacemacs initialization after
 layers configuration."
-(setq helm-fuzzy-match t)
-(setq helm-M-x-fuzzy-match t)
 (rainbow-identifiers-mode)
 (global-set-key (kbd "C-x C-m") 'helm-M-x)
 (setq browse-url-browser-function 'browse-url-generic
@@ -186,101 +196,113 @@ layers configuration."
 (setq-default cursor-type 'line)
 (setq save-interprogram-paste-before-kill t)
 (add-to-list 'auto-mode-alist '("\\.*rc$" . conf-unix-mode))
-(global-set-key "\C-w" 'backward-kill-word)
 (global-set-key "\C-x\C-k" 'kill-region)
-(global-set-key "\C-c\C-k" 'kill-region)
+(defadvice kill-region (before unix-werase activate compile)
+  "When called interactively with no active region, delete a single word
+    backwards instead."
+  (interactive
+   (if mark-active (list (region-beginning) (region-end))
+     (list (save-excursion (backward-word 1) (point)) (point)))))
 (global-set-key (kbd "C-l") 'ace-jump-line-mode)
 (define-key global-map (kbd "C-x C-c") 'ido-kill-buffer)
+(global-set-key (kbd "M-n") 'forward-paragraph)
+(global-set-key (kbd "M-p") 'backward-paragraph)
+(global-set-key (kbd "C-d") 'delete-forward-char)
+(global-set-key (kbd "C-h")  'delete-backward-char)
+(global-set-key (kbd "M-y")  'helm-show-kill-ring)
+(global-set-key (kbd "M-h")  'company-c-headers)
 (delete-selection-mode)
 (setq powerline-default-separator 'nil)
 (spaceline-compile)
+(fringe-mode -1)
+(spaceline-toggle-hud-off)
+;; Activate column indicator in prog-mode and text-mode
+(add-hook 'go-mode-hook 'turn-on-fci-mode)
+(setq go-format-before-save t)
+(setq company-c-headers-path-user
+ (quote
+  ("/home/ubuntu/sdmain/src/cpp/include" "/home/ubuntu/sdmain/bazel-genfiles/src" "/home/ubuntu/sdmain/src/cpp/code")))
+(setq cquery-extra-init-params '( :extraClangArguments ("-std=c++11" "-I/home/ubuntu/sdmain/src/cpp/code" "-I/home/ubuntu/sdmain/bazel-genfiles/src" "-I/home/ubuntu/sdmain/src/cpp/include")))
+(setq ccls-initialization-options '( :clang (:extraArgs ("-std=c++11" "-I/home/ubuntu/sdmain/src/cpp/code" "-I/home/ubuntu/sdmain/bazel-genfiles/src" "-I/home/ubuntu/sdmain/src/cpp/include"))))
+(setq company-clang-arguments
+  (quote
+   ("-I/home/ubuntu/sdmain/src/cpp/code" "-I/home/ubuntu/sdmain/bazel-genfiles/src" "-I/home/ubuntu/sdmain/src/cpp/include")))
+(setq large-file-warning-threshold nil)
+(setq flycheck-clang-include-path
+  (quote
+   ("/home/ubuntu/sdmain/src/cpp/code" "/home/ubuntu/sdmain/bazel-genfiles/src" "/home/ubuntu/sdmain/src/cpp/include")))
+(setq flycheck-check-syntax-automatically '(mode-enabled save))
+(setq lsp-ui-flycheck-live-reporting nil)
+(xclip-mode 1)
 )
 
-;; Do not write anything past this comment. This is where Emacs will
-;; auto-generate custom variable definitions.
+(defun dotspacemacs/emacs-custom-settings ()
+  "Emacs custom settings.
+This is an auto-generated function, do not modify its content directly, use
+Emacs customize menu instead.
+This function is called at the very end of Spacemacs initialization."
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(ansi-color-faces-vector
-   [default default default italic underline success warning error])
  '(compilation-message-face (quote default))
  '(cua-global-mark-cursor-color "#2aa198")
  '(cua-normal-cursor-color "#839496")
  '(cua-overwrite-cursor-color "#b58900")
  '(cua-read-only-cursor-color "#859900")
  '(evil-want-Y-yank-to-eol nil)
- '(fci-rule-color "#000000" t)
  '(highlight-changes-colors (quote ("#d33682" "#6c71c4")))
  '(highlight-symbol-colors
    (--map
-    (solarized-color-blend it "#141414" 0.25)
+    (solarized-color-blend it "#002b36" 0.25)
     (quote
      ("#b58900" "#2aa198" "#dc322f" "#6c71c4" "#859900" "#cb4b16" "#268bd2"))))
  '(highlight-symbol-foreground-color "#93a1a1")
  '(highlight-tail-colors
    (quote
-    (("#000000" . 0)
+    (("#073642" . 0)
      ("#546E00" . 20)
      ("#00736F" . 30)
      ("#00629D" . 50)
      ("#7B6000" . 60)
      ("#8B2C02" . 70)
      ("#93115C" . 85)
-     ("#000000" . 100))))
+     ("#073642" . 100))))
  '(hl-bg-colors
    (quote
     ("#7B6000" "#8B2C02" "#990A1B" "#93115C" "#3F4D91" "#00629D" "#00736F" "#546E00")))
  '(hl-fg-colors
    (quote
-    ("#141414" "#141414" "#141414" "#141414" "#141414" "#141414" "#141414" "#141414")))
+    ("#002b36" "#002b36" "#002b36" "#002b36" "#002b36" "#002b36" "#002b36" "#002b36")))
+ '(hl-paren-colors (quote ("#2aa198" "#b58900" "#268bd2" "#6c71c4" "#859900")))
+ '(jdee-db-active-breakpoint-face-colors (cons "#1E2029" "#bd93f9"))
+ '(jdee-db-requested-breakpoint-face-colors (cons "#1E2029" "#50fa7b"))
+ '(jdee-db-spec-breakpoint-face-colors (cons "#1E2029" "#565761"))
+ '(lsp-ui-doc-enable nil)
+ '(lsp-ui-sideline-enable nil)
  '(magit-diff-use-overlays nil)
- '(nrepl-message-colors
-   (quote
-    ("#dc322f" "#cb4b16" "#b58900" "#546E00" "#B4C342" "#00629D" "#2aa198" "#d33682" "#6c71c4")))
  '(package-selected-packages
    (quote
-    (sql-indent web-beautify livid-mode skewer-mode simple-httpd json-mode json-snatcher json-reformat js2-refactor js2-mode js-doc company-tern dash-functional tern coffee-mode doom-themes apropospriate-theme color-theme-solarized speed-type yaml-mode yapfify pyvenv pytest pyenv-mode py-isort pip-requirements live-py-mode hy-mode helm-pydoc cython-mode company-anaconda anaconda-mode pythonic zenburn-theme xterm-color ws-butler winum which-key volatile-highlights visual-regexp-steroids vi-tilde-fringe uuidgen use-package unfill toc-org spaceline solarized-theme smeargle shell-pop restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters popwin persp-mode pcre2el paradox orgit org-bullets open-junk-file neotree mwim multiple-cursors multi-term move-text magit-gitflow macrostep lorem-ipsum linum-relative link-hint info+ indent-guide hungry-delete hl-todo highlight-parentheses highlight-numbers highlight-indentation hide-comnt help-fns+ helm-themes helm-swoop helm-projectile helm-mode-manager helm-make helm-gitignore helm-flx helm-descbinds helm-company helm-c-yasnippet helm-ag google-translate golden-ratio go-guru go-eldoc gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe git-gutter-fringe+ fuzzy flycheck flx-ido fill-column-indicator fasd fancy-battery eyebrowse expand-region exec-path-from-shell evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-search-highlight-persist evil-numbers evil-nerd-commenter evil-mc evil-matchit evil-magit evil-lisp-state evil-indent-plus evil-iedit-state evil-exchange evil-escape evil-ediff evil-args evil-anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help elisp-slime-nav dumb-jump diff-hl define-word company-statistics company-go column-enforce-mode color-identifiers-mode clean-aindent-mode auto-yasnippet auto-highlight-symbol auto-compile aggressive-indent adaptive-wrap ace-window ace-link ace-jump-mode ace-jump-helm-line ac-ispell)))
- '(pos-tip-background-color "#000000")
+    (json-mode bazel-mode strace-mode 0blayout xresources-theme pyvenv live-py-mode eyebrowse evil-surround evil-nerd-commenter evil-matchit evil-magit eval-sexp-fu eshell-prompt-extras editorconfig dumb-jump doom-themes doom-modeline eldoc-eval diff-hl cython-mode counsel-projectile counsel ivy auto-compile apropospriate-theme aggressive-indent ace-window anaconda-mode smartparens flycheck company projectile helm helm-core magit git-commit markdown-mode f spaceline powerline org-plus-contrib evil goto-chg async zenburn-theme yasnippet-snippets yapfify yaml-mode xterm-color xclip ws-butler writeroom-mode with-editor winum which-key volatile-highlights visual-regexp-steroids vi-tilde-fringe uuidgen use-package unfill undo-tree treepy toc-org systemd symon swiper string-inflection sql-indent speed-type spaceline-all-the-icons solarized-theme smeargle shrink-path shell-pop restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters pytest pyenv-mode py-isort protobuf-mode popwin pippel pipenv pip-requirements persp-mode pcre2el password-generator paradox packed overseer org-bullets open-junk-file neotree nameless mwim multiple-cursors multi-term move-text monokai-theme mmm-mode markdown-toc magit-svn magit-gitflow macrostep lsp-ui lsp-go lorem-ipsum link-hint jinja2-mode indent-guide importmagic hungry-delete hl-todo highlight-parentheses highlight-numbers highlight-indentation highlight helm-xref helm-themes helm-swoop helm-rtags helm-pydoc helm-purpose helm-projectile helm-mode-manager helm-make helm-gitignore helm-git-grep helm-flx helm-descbinds helm-company helm-c-yasnippet helm-ag graphql google-translate google-c-style golden-ratio godoctor go-tag go-rename go-impl go-guru go-gen-test go-fill-struct go-eldoc gitignore-templates gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe git-gutter-fringe+ gh-md fuzzy font-lock+ flycheck-rtags flycheck-golangci-lint flx-ido fill-column-indicator fasd fancy-battery expand-region evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-numbers evil-lisp-state evil-lion evil-indent-plus evil-iedit-state evil-goggles evil-exchange evil-escape evil-ediff evil-cleverparens evil-args evil-anzu eshell-z esh-help elisp-slime-nav dotenv-mode disaster diminish define-word csv-mode cquery company-statistics company-rtags company-lsp company-go company-c-headers company-ansible company-anaconda column-enforce-mode color-identifiers-mode clean-aindent-mode clang-format centered-cursor-mode ccls browse-at-remote badwolf-theme auto-yasnippet auto-highlight-symbol ansible-doc ansible ace-link ace-jump-mode ace-jump-helm-line ac-ispell)))
+ '(paradox-github-token t)
+ '(pos-tip-background-color "#073642")
  '(pos-tip-foreground-color "#93a1a1")
- '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#000000" 0.2))
- '(solarized-distinct-doc-face t)
- '(term-default-bg-color "#141414")
+ '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#073642" 0.2))
+ '(term-default-bg-color "#002b36")
  '(term-default-fg-color "#839496")
- '(vc-annotate-background nil)
  '(vc-annotate-background-mode nil)
- '(vc-annotate-color-map
-   (quote
-    ((20 . "#dc322f")
-     (40 . "#c85d17")
-     (60 . "#be730b")
-     (80 . "#b58900")
-     (100 . "#a58e00")
-     (120 . "#9d9100")
-     (140 . "#959300")
-     (160 . "#8d9600")
-     (180 . "#859900")
-     (200 . "#669b32")
-     (220 . "#579d4c")
-     (240 . "#489e65")
-     (260 . "#399f7e")
-     (280 . "#2aa198")
-     (300 . "#2898af")
-     (320 . "#2793ba")
-     (340 . "#268fc6")
-     (360 . "#268bd2"))))
- '(vc-annotate-very-old-color nil)
  '(weechat-color-list
    (quote
-    (unspecified "#141414" "#000000" "#990A1B" "#dc322f" "#546E00" "#859900" "#7B6000" "#b58900" "#00629D" "#268bd2" "#93115C" "#d33682" "#00736F" "#2aa198" "#839496" "#657b83")))
+    (unspecified "#002b36" "#073642" "#990A1B" "#dc322f" "#546E00" "#859900" "#7B6000" "#b58900" "#00629D" "#268bd2" "#93115C" "#d33682" "#00736F" "#2aa198" "#839496" "#657b83")))
  '(xterm-color-names
-   ["#000000" "#dc322f" "#859900" "#b58900" "#268bd2" "#d33682" "#2aa198" "#eee8d5"])
+   ["#073642" "#dc322f" "#859900" "#b58900" "#268bd2" "#d33682" "#2aa198" "#eee8d5"])
  '(xterm-color-names-bright
-   ["#141414" "#cb4b16" "#586e75" "#657b83" "#839496" "#6c71c4" "#93a1a1" "#fdf6e3"]))
+   ["#002b36" "#cb4b16" "#586e75" "#657b83" "#839496" "#6c71c4" "#93a1a1" "#fdf6e3"]))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  )
+)
