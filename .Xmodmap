@@ -12,13 +12,15 @@ keycode  43 = h H Left
 keycode  44 = j J Down
 keycode  45 = k K Up 
 keycode  46 = l L Right
+keycode  47 = semicolon colon Insert
 keycode  38 = a A Home
-keycode  41 = f F End
-! Page Up
-keycode  39 = s S Prior
-! Page Down
+keycode  26 = e E End
+keycode  41 = f F Prior
+keycode  30 = u U Prior
 keycode  40 = d D Next
+keycode  31 = i I Tab
 keycode  42 = g G Escape
+keycode  24 = q Q Insert
 
 keycode  10 = 1 exclam F1
 keycode  11 = 2 at F2

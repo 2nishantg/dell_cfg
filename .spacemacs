@@ -12,7 +12,10 @@
    ;; List of configuration layers to load. If it is the symbol `all' instead
    ;; of a list then all discovered layers will be installed.
    dotspacemacs-configuration-layers
-   '(csv
+   '(html
+     javascript
+     php
+     csv
      systemd
      markdown
      ansible
@@ -25,22 +28,25 @@
             c-c++-enable-google-style t
             c-c++-enable-google-newline t
             c-c++-backend 'lsp-ccls
-            c-c++-lsp-sem-highlight-method 'font-lock
             c-c++-default-mode-for-headers 'c++-mode)
      colors
      emacs-lisp
      fasd
      git
+     (gtags :variables gtags-enable-by-default t)
      (go :variables
          go-use-golangci-lint t
          godoc-at-point-function 'godoc-gogetdoc
          go-tab-width 2
-         go-backend 'lsp
          gofmt-command "goimports"
          gofmt-args (list "-local" "rubrik"))
      lsp
+     (org :variables
+          org-enable-reveal-js-support t
+          org-enable-bootstrap-support t)
      protobuf
      python
+     selectric
      (shell :variables
             shell-default-term-shell "/bin/zsh")
      syntax-checking
@@ -51,8 +57,11 @@
    ;; packages then consider to create a layer, you can also put the
    ;; configuration in `dotspacemacs/config'.
    dotspacemacs-additional-packages '(
+                                      nimbus-theme
+                                      epc
                                       json-mode
                                       strace-mode
+                                      bazel-mode
                                       xclip
                                       badwolf-theme
                                       doom-themes
@@ -89,7 +98,7 @@ before layers configuration."
    ;; directory. A string value must be a path to an image format supported
    ;; by your Emacs build.
    ;; If the value is nil then no banner is displayed.
-   dotspacemacs-startup-banner 'official
+   dotspacemacs-startup-banner nil
    ;; List of items to show in the startup buffer. If nil it is disabled.
    ;; Possible values are: `recents' `bookmarks' `projects'."
    dotspacemacs-startup-lists '(recents projects)
@@ -97,6 +106,7 @@ before layers configuration."
    ;; Press <SPC> T n to cycle to the next theme in the list (works great
    ;; with 2 themes variants, one dark and one light)
    dotspacemacs-themes '(
+                         nimbus
                          doom-tomorrow-night
                          zenburn
                          xresources
@@ -110,8 +120,8 @@ before layers configuration."
    ;; Default font. `powerline-scale' allows to quickly tweak the mode-line
    ;; size to make separators look not too crappy.
    ;;dotspacemacs-default-font '("Iosevka Nerd Font"
-   dotspacemacs-default-font '("Iosevka"
-                               :size 16
+   dotspacemacs-default-font '("Iosevka Nerd Font"
+                               :size 15
                                :powerline-scale 1.0)
    ;; The leader key
    dotspacemacs-leader-key "SPC"
@@ -132,7 +142,7 @@ before layers configuration."
    dotspacemacs-use-ido nil
    ;; If non nil the paste micro-state is enabled. When enabled pressing `p`
    ;; several times cycle between the kill ring content.
-   dotspacemacs-enable-paste-micro-state t
+   dotspacemacs-enable-paste-micro-state nil
    ;; Guide-key delay in seconds. The Guide-key is the popup buffer listing
    ;; the commands bound to the current keystrokes.
    dotspacemacs-guide-key-delay 0.3
@@ -173,7 +183,7 @@ before layers configuration."
    dotspacemacs-persistent-server t
    ;; List of search tool executable names. Spacemacs uses the first installed
    ;; tool of the list. Supported tools are `ag', `pt', `ack' and `grep'.
-   dotspacemacs-search-tools '("ag" "pt" "ack" "grep")
+   dotspacemacs-search-tools '("rg" "ag" "pt" "ack" "grep")
    ;; The default package repository used if no explicit repository has been
    ;; specified with an installed package.
    ;; Not used for now.
@@ -182,7 +192,23 @@ before layers configuration."
   )
 
 (defun dotspacemacs/user-init ()
+  (defun fontify-frame (frame)
+    (interactive)
+    (if window-system
+        (progn
+          (if (> (x-display-pixel-width) 4000)
+              (set-frame-parameter frame 'font "Iosevka Nerd Font 18") ;; Cinema Display
+            (set-frame-parameter frame 'font "Iosevka Nerd Font 13")))))
 
+  (defun fontify-current-frame ()
+    (interactive)
+    (if window-system
+        (progn
+          (if (> (x-display-pixel-width) 4000)
+              (set-frame-parameter nil 'font "Iosevka Nerd Font 18") ;; Cinema Display
+            (set-frame-parameter nil 'font "Iosevka Nerd Font 13")))))
+
+  ;; Fontify any future frames
  )
 
 (defun dotspacemacs/user-config ()
@@ -220,20 +246,44 @@ layers configuration."
 (add-hook 'go-mode-hook 'turn-on-fci-mode)
 (setq go-format-before-save t)
 (setq company-c-headers-path-user
- (quote
-  ("/home/ubuntu/sdmain/src/cpp/include" "/home/ubuntu/sdmain/bazel-genfiles/src" "/home/ubuntu/sdmain/src/cpp/code")))
-(setq cquery-extra-init-params '( :extraClangArguments ("-std=c++11" "-I/home/ubuntu/sdmain/src/cpp/code" "-I/home/ubuntu/sdmain/bazel-genfiles/src" "-I/home/ubuntu/sdmain/src/cpp/include")))
-(setq ccls-initialization-options '( :clang (:extraArgs ("-std=c++11" "-I/home/ubuntu/sdmain/src/cpp/code" "-I/home/ubuntu/sdmain/bazel-genfiles/src" "-I/home/ubuntu/sdmain/src/cpp/include"))))
-(setq company-clang-arguments
-  (quote
-   ("-I/home/ubuntu/sdmain/src/cpp/code" "-I/home/ubuntu/sdmain/bazel-genfiles/src" "-I/home/ubuntu/sdmain/src/cpp/include")))
+      '("/home/ubuntu/sdmain/src/cpp/include"
+        "/home/ubuntu/sdmain/bazel-genfiles/src"
+        "/home/ubuntu/sdmain/src/cpp/code"))
+(setq ccls-initialization-options
+      '( :clang (:extraArgs ("-xc++"
+                             "-Wall"
+                             "-Wno-macro-redefined"
+                             "-Wno-unused-local-typedefs"
+                             "-Wno-pointer-arith"
+                             "-Wtype-limits"
+                             "-std=c++11"
+                             "-I/home/nis/code/sources/linux/include"
+                             "-I/home/ubuntu/sdmain/src/cpp/code"
+                             "-I/home/ubuntu/sdmain/bazel-genfiles/src"
+                             "-I/home/ubuntu/sdmain/src/cpp/include"))))
+(setq flycheck-clang-args '("-Wno-macro-redefined" "-Wall"))
 (setq large-file-warning-threshold nil)
-(setq flycheck-clang-include-path
-  (quote
-   ("/home/ubuntu/sdmain/src/cpp/code" "/home/ubuntu/sdmain/bazel-genfiles/src" "/home/ubuntu/sdmain/src/cpp/include")))
 (setq flycheck-check-syntax-automatically '(mode-enabled save))
+(setq lsp-ui-doc-enable nil)
+(setq lsp-ui-sideline-enable nil)
 (setq lsp-ui-flycheck-live-reporting nil)
+(setq lsp-enable-on-type-formatting nil)
+(setq lsp-enable-indentation nil)
+(setq lsp-eldoc-hook '(lsp-hover))
+(setq winum-scope 'frame-local)
 (xclip-mode 1)
+(transient-mark-mode -1)
+(spacemacs/set-leader-keys "pf" 'counsel-projectile-find-file)
+
+(setq-default js2-basic-offset 2
+              js-indent-level 2)
+
+
+;;(setq c-c++-enable-clang-format-on-save nil)
+
+;; Org mode
+(setq org-agenda-files '("/home/nis/personal.org" "/home/nis/work.org"))
+(setq org-bullets-bullet-list '("■" "◆" "▲" "▶"))
 )
 
 (defun dotspacemacs/emacs-custom-settings ()
@@ -246,59 +296,18 @@ This function is called at the very end of Spacemacs initialization."
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(compilation-message-face (quote default))
- '(cua-global-mark-cursor-color "#2aa198")
- '(cua-normal-cursor-color "#839496")
- '(cua-overwrite-cursor-color "#b58900")
- '(cua-read-only-cursor-color "#859900")
  '(evil-want-Y-yank-to-eol nil)
- '(highlight-changes-colors (quote ("#d33682" "#6c71c4")))
- '(highlight-symbol-colors
-   (--map
-    (solarized-color-blend it "#002b36" 0.25)
-    (quote
-     ("#b58900" "#2aa198" "#dc322f" "#6c71c4" "#859900" "#cb4b16" "#268bd2"))))
- '(highlight-symbol-foreground-color "#93a1a1")
- '(highlight-tail-colors
-   (quote
-    (("#073642" . 0)
-     ("#546E00" . 20)
-     ("#00736F" . 30)
-     ("#00629D" . 50)
-     ("#7B6000" . 60)
-     ("#8B2C02" . 70)
-     ("#93115C" . 85)
-     ("#073642" . 100))))
- '(hl-bg-colors
-   (quote
-    ("#7B6000" "#8B2C02" "#990A1B" "#93115C" "#3F4D91" "#00629D" "#00736F" "#546E00")))
- '(hl-fg-colors
-   (quote
-    ("#002b36" "#002b36" "#002b36" "#002b36" "#002b36" "#002b36" "#002b36" "#002b36")))
- '(hl-paren-colors (quote ("#2aa198" "#b58900" "#268bd2" "#6c71c4" "#859900")))
- '(jdee-db-active-breakpoint-face-colors (cons "#1E2029" "#bd93f9"))
- '(jdee-db-requested-breakpoint-face-colors (cons "#1E2029" "#50fa7b"))
- '(jdee-db-spec-breakpoint-face-colors (cons "#1E2029" "#565761"))
- '(lsp-ui-doc-enable nil)
- '(lsp-ui-sideline-enable nil)
- '(magit-diff-use-overlays nil)
  '(package-selected-packages
    (quote
-    (json-mode bazel-mode strace-mode 0blayout xresources-theme pyvenv live-py-mode eyebrowse evil-surround evil-nerd-commenter evil-matchit evil-magit eval-sexp-fu eshell-prompt-extras editorconfig dumb-jump doom-themes doom-modeline eldoc-eval diff-hl cython-mode counsel-projectile counsel ivy auto-compile apropospriate-theme aggressive-indent ace-window anaconda-mode smartparens flycheck company projectile helm helm-core magit git-commit markdown-mode f spaceline powerline org-plus-contrib evil goto-chg async zenburn-theme yasnippet-snippets yapfify yaml-mode xterm-color xclip ws-butler writeroom-mode with-editor winum which-key volatile-highlights visual-regexp-steroids vi-tilde-fringe uuidgen use-package unfill undo-tree treepy toc-org systemd symon swiper string-inflection sql-indent speed-type spaceline-all-the-icons solarized-theme smeargle shrink-path shell-pop restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters pytest pyenv-mode py-isort protobuf-mode popwin pippel pipenv pip-requirements persp-mode pcre2el password-generator paradox packed overseer org-bullets open-junk-file neotree nameless mwim multiple-cursors multi-term move-text monokai-theme mmm-mode markdown-toc magit-svn magit-gitflow macrostep lsp-ui lsp-go lorem-ipsum link-hint jinja2-mode indent-guide importmagic hungry-delete hl-todo highlight-parentheses highlight-numbers highlight-indentation highlight helm-xref helm-themes helm-swoop helm-rtags helm-pydoc helm-purpose helm-projectile helm-mode-manager helm-make helm-gitignore helm-git-grep helm-flx helm-descbinds helm-company helm-c-yasnippet helm-ag graphql google-translate google-c-style golden-ratio godoctor go-tag go-rename go-impl go-guru go-gen-test go-fill-struct go-eldoc gitignore-templates gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe git-gutter-fringe+ gh-md fuzzy font-lock+ flycheck-rtags flycheck-golangci-lint flx-ido fill-column-indicator fasd fancy-battery expand-region evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-numbers evil-lisp-state evil-lion evil-indent-plus evil-iedit-state evil-goggles evil-exchange evil-escape evil-ediff evil-cleverparens evil-args evil-anzu eshell-z esh-help elisp-slime-nav dotenv-mode disaster diminish define-word csv-mode cquery company-statistics company-rtags company-lsp company-go company-c-headers company-ansible company-anaconda column-enforce-mode color-identifiers-mode clean-aindent-mode clang-format centered-cursor-mode ccls browse-at-remote badwolf-theme auto-yasnippet auto-highlight-symbol ansible-doc ansible ace-link ace-jump-mode ace-jump-helm-line ac-ispell)))
+    (zenburn-theme yasnippet-snippets yapfify yaml-mode xterm-color xresources-theme xclip ws-butler writeroom-mode visual-fill-column winum web-mode web-beautify volatile-highlights visual-regexp-steroids visual-regexp vi-tilde-fringe uuidgen unfill treemacs-projectile treemacs-evil treemacs pfuture toc-org tagedit systemd symon string-inflection strace-mode sql-indent speed-type spaceline-all-the-icons spaceline powerline solarized-theme smeargle slim-mode shell-pop selectric-mode scss-mode sass-mode restart-emacs rainbow-mode rainbow-identifiers rainbow-delimiters pyvenv pytest pyenv-mode py-isort pug-mode protobuf-mode prettier-js popwin pippel pipenv pip-requirements phpunit phpcbf php-extras php-auto-yasnippets persp-mode password-generator paradox ox-twbs ox-reveal overseer orgit org-projectile org-category-capture org-present org-mime org-download org-bullets org-brain open-junk-file nameless mwim multi-term move-text monokai-theme mmm-mode markdown-toc magit-svn magit-gitflow magit-popup macrostep lsp-ui markdown-mode lorem-ipsum livid-mode skewer-mode live-py-mode link-hint json-navigator hierarchy json-mode json-snatcher json-reformat js2-refactor multiple-cursors js2-mode js-doc jinja2-mode indent-guide importmagic impatient-mode simple-httpd hungry-delete htmlize hl-todo highlight-parentheses highlight-numbers parent-mode highlight-indentation helm-xref helm-themes helm-swoop helm-rtags helm-pydoc helm-purpose window-purpose imenu-list helm-projectile helm-org-rifle helm-mode-manager helm-make helm-gitignore request helm-git-grep helm-flx helm-descbinds helm-css-scss helm-company helm-c-yasnippet helm-ag haml-mode google-translate google-c-style golden-ratio godoctor go-tag go-rename go-impl go-guru go-gen-test go-fill-struct go-eldoc gnuplot gitignore-templates gitignore-mode gitconfig-mode gitattributes-mode git-timemachine git-messenger git-link git-gutter-fringe+ git-gutter-fringe fringe-helper git-gutter+ git-gutter gh-md fuzzy flycheck-rtags flycheck-golangci-lint flycheck flx-ido flx fill-column-indicator fasd fancy-battery eyebrowse expand-region evil-visualstar evil-visual-mark-mode evil-unimpaired evil-tutor evil-surround evil-org evil-numbers evil-nerd-commenter evil-matchit evil-magit magit transient git-commit with-editor lv evil-lisp-state evil-lion evil-indent-plus evil-iedit-state iedit evil-goggles evil-exchange evil-escape evil-ediff evil-cleverparens smartparens paredit evil-args evil-anzu anzu eval-sexp-fu eshell-z eshell-prompt-extras esh-help epc ctable concurrent deferred emmet-mode elisp-slime-nav editorconfig dumb-jump drupal-mode doom-themes doom-modeline eldoc-eval shrink-path all-the-icons memoize disaster diff-hl define-word cython-mode csv-mode cquery counsel-projectile counsel swiper ivy company-web web-completion-data company-tern tern company-statistics company-rtags rtags company-php ac-php-core xcscope php-mode company-lsp company-go go-mode company-c-headers company-ansible company-anaconda company column-enforce-mode color-identifiers-mode clean-aindent-mode clang-format centered-cursor-mode ccls projectile lsp-mode spinner ht dash-functional pkg-info epl browse-at-remote bazel-mode badwolf-theme auto-yasnippet yasnippet auto-highlight-symbol auto-compile packed ansible-doc ansible anaconda-mode pythonic f dash s aggressive-indent ace-window ace-link ace-jump-mode ace-jump-helm-line helm avy helm-core ac-ispell auto-complete popup which-key use-package pcre2el org-plus-contrib hydra font-lock+ evil goto-chg undo-tree dotenv-mode diminish bind-map bind-key async)))
  '(paradox-github-token t)
- '(pos-tip-background-color "#073642")
- '(pos-tip-foreground-color "#93a1a1")
- '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#073642" 0.2))
- '(term-default-bg-color "#002b36")
- '(term-default-fg-color "#839496")
- '(vc-annotate-background-mode nil)
- '(weechat-color-list
+ '(safe-local-variable-values
    (quote
-    (unspecified "#002b36" "#073642" "#990A1B" "#dc322f" "#546E00" "#859900" "#7B6000" "#b58900" "#00629D" "#268bd2" "#93115C" "#d33682" "#00736F" "#2aa198" "#839496" "#657b83")))
- '(xterm-color-names
-   ["#073642" "#dc322f" "#859900" "#b58900" "#268bd2" "#d33682" "#2aa198" "#eee8d5"])
- '(xterm-color-names-bright
-   ["#002b36" "#cb4b16" "#586e75" "#657b83" "#839496" "#6c71c4" "#93a1a1" "#fdf6e3"]))
+    ((gtags-enable-by-default . t)
+     (javascript-backend . tern)
+     (javascript-backend . lsp)
+     (go-backend . go-mode)
+     (go-backend . lsp)))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
